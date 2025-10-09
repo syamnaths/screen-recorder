@@ -94,6 +94,15 @@ async function startRecording() {
 
         stream = new MediaStream(tracks);
 
+        // Show recording indicator if sharing the current tab
+        const videoTrackSettings = stream.getVideoTracks()[0].getSettings();
+        if (videoTrackSettings.displaySurface === 'browser') {
+            const indicator = document.createElement('div');
+            indicator.id = 'recording-indicator';
+            indicator.className = 'recording-indicator';
+            document.body.appendChild(indicator);
+        }
+
         console.log("Audio Tracks: ", stream.getAudioTracks());
         if (stream.getAudioTracks().length === 0) {
             console.warn("No audio track was found. Audio will not be recorded.");
@@ -205,6 +214,13 @@ function stopRecording() {
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
     }
+
+    // Remove recording indicator
+    const indicator = document.getElementById('recording-indicator');
+    if (indicator) {
+        indicator.remove();
+    }
+
     isRecording = false;
     toggleRecordingBtn.textContent = 'Record Screen';
     toggleRecordingBtn.classList.remove('recording');
