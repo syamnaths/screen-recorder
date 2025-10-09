@@ -54,27 +54,38 @@ function saveRecordingToList(fileName) {
 }
 
 async function startRecording() {
+    let audioStream;
+    let fileHandle;
     try {
-        let fileHandle;
-        // Use the efficient File System Access API if available (Chrome/Edge)
-        if ('showSaveFilePicker' in window) {
-            fileHandle = await getOutputFileHandle();
-            if (!fileHandle) {
-                // User cancelled the file picker
-                return;
-            }
-        }
-
-        const videoStream = await navigator.mediaDevices.getDisplayMedia({
-            video: { mediaSource: 'screen' }
-        });
-
-        let audioStream;
+        // 1. Get Audio permission first
         try {
             audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         } catch (err) {
             console.warn("Could not get microphone audio. Recording without audio.");
         }
+
+        // 2. Get the output file handle before showing the screen picker
+        if ('showSaveFilePicker' in window) {
+            fileHandle = await getOutputFileHandle();
+            if (!fileHandle) {
+                // User cancelled the file picker, release audio if acquired
+                if (audioStream) {
+                    audioStream.getTracks().forEach(track => track.stop());
+                }
+                return;
+            }
+        }
+
+        // 3. Get Video stream (screen, window, or tab)
+        const videoStream = await navigator.mediaDevices.getDisplayMedia({
+            video: true // Use modern, more robust constraint
+        });
+
+        // Handle the "Stop sharing" button in the browser UI
+        const videoTrack = videoStream.getVideoTracks()[0];
+        videoTrack.onended = () => {
+            stopRecording();
+        };
 
         const tracks = [...videoStream.getTracks()];
         if (audioStream) {
@@ -97,7 +108,10 @@ async function startRecording() {
 
     } catch (err) {
         console.error("Error starting recording: ", err);
-        // Handle cases where user denies screen sharing permission
+        // Handle cases where user denies screen/audio permission or other errors
+        if (audioStream) {
+            audioStream.getTracks().forEach(track => track.stop());
+        }
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
