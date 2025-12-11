@@ -1,11 +1,14 @@
 const toggleRecordingBtn = document.getElementById('toggleRecording');
 const recordingList = document.getElementById('recordingList');
+const facecamToggle = document.getElementById('facecamToggle');
 
 let isRecording = false;
 let mediaRecorder;
 let stream;
 let recordedChunks = [];
 let writableStream = null;
+let facecamStream = null;
+let facecamVideo = null;
 
 const RECORDING_STORAGE_KEY = 'screenRecordings';
 
@@ -57,11 +60,21 @@ async function startRecording() {
     let audioStream;
     let fileHandle;
     try {
-        // 1. Get Audio permission first
-        try {
-            audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch (err) {
-            console.warn("Could not get microphone audio. Recording without audio.");
+        // 1. Get Audio/Video permissions
+        if (facecamToggle.checked) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                audioStream = new MediaStream(stream.getAudioTracks());
+                facecamStream = new MediaStream(stream.getVideoTracks());
+            } catch (err) {
+                console.warn("Could not get camera and microphone. Recording without them.", err);
+            }
+        } else {
+            try {
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (err) {
+                console.warn("Could not get microphone audio. Recording without audio.", err);
+            }
         }
 
         // 2. Get the output file handle before showing the screen picker
@@ -69,9 +82,8 @@ async function startRecording() {
             fileHandle = await getOutputFileHandle();
             if (!fileHandle) {
                 // User cancelled the file picker, release audio if acquired
-                if (audioStream) {
-                    audioStream.getTracks().forEach(track => track.stop());
-                }
+                if (audioStream) audioStream.getTracks().forEach(track => track.stop());
+                if (facecamStream) facecamStream.getTracks().forEach(track => track.stop());
                 return;
             }
         }
@@ -93,6 +105,23 @@ async function startRecording() {
         }
 
         stream = new MediaStream(tracks);
+
+        // If facecam is enabled, create and add the video element
+        if (facecamStream) {
+            facecamVideo = document.createElement('video');
+            facecamVideo.id = 'facecamVideo';
+            facecamVideo.srcObject = facecamStream;
+            facecamVideo.autoplay = true;
+            facecamVideo.playsInline = true; // Important for mobile
+            facecamVideo.muted = true; // Mute our own feedback
+            
+            // Set initial position
+            facecamVideo.style.top = `${window.innerHeight - 170}px`;
+            facecamVideo.style.left = `${window.innerWidth - 170}px`;
+
+            document.body.appendChild(facecamVideo);
+            makeDraggable(facecamVideo);
+        }
 
         // Show recording indicator if sharing the current tab
         const videoTrackSettings = stream.getVideoTracks()[0].getSettings();
@@ -118,12 +147,9 @@ async function startRecording() {
     } catch (err) {
         console.error("Error starting recording: ", err);
         // Handle cases where user denies screen/audio permission or other errors
-        if (audioStream) {
-            audioStream.getTracks().forEach(track => track.stop());
-        }
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-        }
+        if (audioStream) audioStream.getTracks().forEach(track => track.stop());
+        if (facecamStream) facecamStream.getTracks().forEach(track => track.stop());
+        if (stream) stream.getTracks().forEach(track => track.stop());
     }
 }
 
@@ -215,6 +241,16 @@ function stopRecording() {
         stream.getTracks().forEach(track => track.stop());
     }
 
+    // Stop facecam stream and remove video element
+    if (facecamStream) {
+        facecamStream.getTracks().forEach(track => track.stop());
+        facecamStream = null;
+    }
+    if (facecamVideo) {
+        facecamVideo.remove();
+        facecamVideo = null;
+    }
+
     // Remove recording indicator
     const indicator = document.getElementById('recording-indicator');
     if (indicator) {
@@ -226,4 +262,34 @@ function stopRecording() {
     toggleRecordingBtn.classList.remove('recording');
     stream = null;
     mediaRecorder = null;
+}
+
+function makeDraggable(element) {
+    let isDragging = false;
+    let offsetX, offsetY;
+
+    element.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        offsetX = e.clientX - element.getBoundingClientRect().left;
+        offsetY = e.clientY - element.getBoundingClientRect().top;
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        let newX = e.clientX - offsetX;
+        let newY = e.clientY - offsetY;
+
+        // Constrain to viewport
+        newX = Math.max(0, Math.min(newX, window.innerWidth - element.offsetWidth));
+        newY = Math.max(0, Math.min(newY, window.innerHeight - element.offsetHeight));
+
+        element.style.left = `${newX}px`;
+        element.style.top = `${newY}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
 }
