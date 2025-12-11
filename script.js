@@ -114,7 +114,7 @@ async function startRecording() {
             facecamVideo.autoplay = true;
             facecamVideo.playsInline = true; // Important for mobile
             facecamVideo.muted = true; // Mute our own feedback
-            
+
             // Set initial position
             facecamVideo.style.top = `${window.innerHeight - 170}px`;
             facecamVideo.style.left = `${window.innerWidth - 170}px`;
@@ -277,7 +277,7 @@ function makeDraggable(element) {
 
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
-        
+
         let newX = e.clientX - offsetX;
         let newY = e.clientY - offsetY;
 
@@ -293,3 +293,56 @@ function makeDraggable(element) {
         isDragging = false;
     });
 }
+
+// Keyboard Shortcut Visualization
+const shortcutDisplay = document.getElementById('shortcut-display');
+let shortcutTimeout;
+
+window.addEventListener('keydown', (e) => {
+    // Ignore if typing in an input field (though we don't have text inputs yet, it's good practice)
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+        return;
+    }
+
+    // Capture the key
+    let key = e.key;
+
+    // Make special keys more readable
+    if (key === ' ') {
+        key = 'Space';
+    } else if (key.length === 1) {
+        key = key.toUpperCase();
+    }
+
+    // If modifiers are pressed, show combination
+    const modifiers = [];
+    if (e.ctrlKey) modifiers.push('Ctrl');
+    if (e.altKey) modifiers.push('Alt');
+    if (e.shiftKey) modifiers.push('Shift');
+    if (e.metaKey) modifiers.push('Cmd'); // Command key on Mac
+
+    if (modifiers.length > 0 && !modifiers.includes(key)) {
+        // Avoid duplicates like "Shift + Shift"
+        if (key === 'Control' || key === 'Alt' || key === 'Shift' || key === 'Meta') {
+            // Just show modifiers if only modifier is pressed (or keep accumulating)
+            // For simplicity, let's just show what we have so far
+            shortcutDisplay.textContent = modifiers.join(' + ');
+        } else {
+            shortcutDisplay.textContent = modifiers.join(' + ') + ' + ' + key;
+        }
+    } else {
+        // Filter out isolated modifier key presses if we want, or show them.
+        // User asked for "types on keyboard", usually means characters, but shortcuts include modifiers.
+        // Let's show everything.
+        shortcutDisplay.textContent = key;
+    }
+
+    // Show the display
+    shortcutDisplay.classList.add('show');
+
+    // Reset fade out timer
+    clearTimeout(shortcutTimeout);
+    shortcutTimeout = setTimeout(() => {
+        shortcutDisplay.classList.remove('show');
+    }, 1500); // Fade out after 1.5 seconds
+});
