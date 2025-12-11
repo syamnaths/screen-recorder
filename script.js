@@ -137,6 +137,9 @@ async function startRecording() {
             console.warn("No audio track was found. Audio will not be recorded.");
         }
 
+        // Countdown before final confirmation/start
+        await runCountdown(5);
+
         if (fileHandle) {
             await startRecordingWithFileSystemAccess(fileHandle);
         } else {
@@ -346,3 +349,43 @@ window.addEventListener('keydown', (e) => {
         shortcutDisplay.classList.remove('show');
     }, 1500); // Fade out after 1.5 seconds
 });
+
+function playBeep() {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime); // 1000 Hz
+    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // 10% volume
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.1); // Beep for 0.1 seconds
+}
+
+function runCountdown(seconds) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.id = 'countdown-overlay';
+        document.body.appendChild(overlay);
+
+        let count = seconds;
+        overlay.textContent = count;
+        playBeep();
+
+        const interval = setInterval(() => {
+            count--;
+            if (count > 0) {
+                overlay.textContent = count;
+                playBeep();
+            } else {
+                clearInterval(interval);
+                overlay.remove();
+                resolve();
+            }
+        }, 1000);
+    });
+}

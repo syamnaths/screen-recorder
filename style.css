@@ -149,3 +149,21 @@ p {
     opacity: 1;
     transition: opacity 0.1s ease-in;
 }
+
+/* Countdown Overlay */
+#countdown-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 20000;
+    font-size: 10rem;
+    font-weight: bold;
+    color: white;
+    backdrop-filter: blur(5px);
+}
