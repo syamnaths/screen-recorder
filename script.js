@@ -126,16 +126,25 @@ async function startRecording() {
 
         // 3. Get the output file handle before showing the screen picker
         if ('showSaveFilePicker' in window) {
-            fileHandle = await getOutputFileHandle();
-            if (!fileHandle) {
-                // User cancelled the file picker
-                if (audioStream) audioStream.getTracks().forEach(track => track.stop());
-                if (facecamStream) facecamStream.getTracks().forEach(track => track.stop());
-                if (pipWindow) {
-                    pipWindow.close();
-                    window.currentPiPWindow = null;
+            try {
+                fileHandle = await getOutputFileHandle();
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    // User cancelled the file picker - stop everything
+                    console.log("User cancelled file picker.");
+                    if (audioStream) audioStream.getTracks().forEach(track => track.stop());
+                    if (facecamStream) facecamStream.getTracks().forEach(track => track.stop());
+                    if (pipWindow) {
+                        pipWindow.close();
+                        window.currentPiPWindow = null;
+                    }
+                    return;
+                } else {
+                    // Other error (e.g. SecurityError due to activation consumption)
+                    // Log warning and proceed to fallback recording (Blob download)
+                    console.warn("File Picker failed (likely permission/activation issue), falling back to download:", err);
+                    fileHandle = null;
                 }
-                return;
             }
         }
 
@@ -262,21 +271,16 @@ async function startRecording() {
 }
 
 async function getOutputFileHandle() {
-    try {
-        const suggestedName = `recording-${new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-')}.webm`;
-        const fileHandle = await window.showSaveFilePicker({
-            suggestedName,
-            types: [{
-                description: 'WebM Video File',
-                accept: { 'video/webm': ['.webm'] },
-            }],
-        });
-        return fileHandle;
-    } catch (err) {
-        // Handle user cancellation of the file picker
-        console.log("User cancelled the file picker.");
-        return null;
-    }
+    // Let errors bubble up so strictly handle "user cancelled" vs "not allowed" in caller
+    const suggestedName = `recording-${new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-')}.webm`;
+    const fileHandle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [{
+            description: 'WebM Video File',
+            accept: { 'video/webm': ['.webm'] },
+        }],
+    });
+    return fileHandle;
 }
 
 async function startRecordingWithFileSystemAccess(fileHandle) {
